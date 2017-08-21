@@ -1,0 +1,13 @@
+osticket
+logs/*
+.vagrant
+
+# Guess who uses eclipse?:
+.buildpath
+.project
+.settings
+*.sql
+
+# Vagrant specific ubuntu weirdness:
+ubuntu-*-console.log
+index.html
