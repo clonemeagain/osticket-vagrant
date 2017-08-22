@@ -46,8 +46,7 @@ APT="apt-get -yq --no-install-suggests --no-install-recommends "
 
 # Start by creating/clearing the logfile
 if ! [ -f "$LOG" ];	then touch $LOG; else >$LOG; fi
-if ! [ -d "$DOCROOT" ]; then mkdir -p $DOCROOT; fi
-
+if ! [ -d "$DOCROOT" ];then	mkdir -p $DOCROOT;fi
 date >> $LOG
 
 # Ignore things that aren't critical:
@@ -83,6 +82,11 @@ VHOST=$(cat <<EOF
     </Directory>
     CustomLog ${LOGS}/access.log combined
     ErrorLog ${LOGS}/error.log
+    
+    ProxyRequests Off
+	ProxyPass /mailcatcher http://localhost:1080
+	ProxyPass /assets http://localhost:1080/assets
+	ProxyPass /messages ws://localhost:1080/messages
 </VirtualHost>
 EOF
 )
@@ -92,7 +96,7 @@ echo -e "EnableSendfile Off" >> /etc/apache2/apache2.conf
 # Prevent log error about reliably determining server name
 echo -e "ServerName osTicket" >> /etc/apache2/apache2.conf
 echo -e "127.0.0.1      osticket" >> /etc/hosts
-echo -e "\n--- Setting apache log directory to ${LOGS} \n"
+echo -e "\n--- Setting apache log directory to ./logs \n"
 # We probably want to be able to view the errors.. because otherwise it's harsh..
 if ! [ -d $LOGS ]; then mkdir $LOGS; fi
 # Ensure everything can log to this folder:
@@ -102,7 +106,7 @@ sed -ie "s|/var/log/apache2/|${LOGS}|" /etc/apache2/envvars
 
 ############################################################################################################ PHP Setup
 echo -e "\n--- Installing PHP as Apache Module & Install PHP Modules \n"
-$APT install php php-apcu php-bz2 php-cli php-common php-curl php-gd php-gettext php-igbinary php-imap php-intl php-mbstring php-mcrypt php-mysql php-pear php-gettext php-phpseclib php-redis php-soap php-sqlite3 php-tcpdf php-tidy php-xdebug php-xml php-zip php7.0 php7.0-bz2 phpmyadmin libapache2-mod-php >> $LOG
+$APT install php php-apcu php-bz2 php-cli php-common php-curl php-gd php-gettext php-igbinary php-imap php-intl php-mbstring php-mcrypt php-mysql php-pear php-gettext php-phpseclib php-redis php-soap php-sqlite3 php-tcpdf php-tidy php-xdebug php-xml php-zip php7.0 php7.0-bz2 libapache2-mod-php >> $LOG
 
 PHP_DIR="/etc/php/7.0/apache2"
 
@@ -138,6 +142,30 @@ then
     mkdir -p "${LOGS}/profiler"
     chmod 777 "${LOGS}/profiler"
 fi
+# Ensure xdebug can write to the xdebug.log file
+if ! [[ -f "${LOGS}/xdebug.log" ]]
+then
+    touch $LOGS/xdebug.log
+fi
+chmod 666 $LOGS/xdebug.log
+
+echo -e "\n--- Installing mailcatcher from http://mailcatcher.me => http://localhost:8080/mailcatcher \n"
+# http://mailcatcher.me/
+$APT install -y ruby-dev libsqlite3-dev >> $LOG
+gem install mailcatcher >> $LOG
+# enable apache proxy modules to configure a reverse proxy to mailcatchers webfrontend
+a2enmod proxy proxy_http proxy_wstunnel >> $LOG
+ 
+# replace sendmail path in php.ini with catchmail path
+CATCHMAIL="$(which catchmail)"
+sed -i "s|;sendmail_path\s=.*|sendmail_path = ${CATCHMAIL} -f www-data@localhost|" $PHP_DIR/php.ini
+
+# Make it start on boot (without having to reprovision)
+echo "@reboot root ${CATCHMAIL} --ip=0.0.0.0" >> /etc/crontab
+update-rc.d cron defaults
+# Start
+$CATCHMAIL --ip=0.0.0.0
+
 echo -e "\n--- Restarting Apache to activate PHP configuration. \n"
 service apache2 restart >> $LOG
 
@@ -155,7 +183,7 @@ debconf-set-selections <<< "phpmyadmin phpmyadmin/mysql/admin-pass password ${DB
 debconf-set-selections <<< "phpmyadmin phpmyadmin/mysql/app-pass password ${DBPASSWD}"
 debconf-set-selections <<< "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2"
 
-$APT install mysql-server mysql-client >> $LOG
+$APT install mysql-server mysql-client phpmyadmin >> $LOG
 
 MYSQL=`which mysql`
 if ! [[ -x "${MYSQL}" ]]
@@ -167,36 +195,37 @@ else
 user=${DBUSER}
 password=${DBPASSWD}
 " > ~/.my.cnf
-	echo -e "\n--- Allowing remote MySQL access (Remove this in Prod!)\n";
-	sed -i -e 's/127.0.0.1/0.0.0.0/' /etc/mysql/my.cnf
+    echo -e "\n--- Allowing remote MySQL access (Remove this in Prod!)\n";
+    sed -i -e 's/127.0.0.1/0.0.0.0/' /etc/mysql/my.cnf
 
-        cd $DOCROOT
-	for database in `ls *.sql | sort`
-	do
-            base=$(basename "$database")
-            NAME="${base%.*}"
-		SECONDS=0
-		echo -e "\n--- Loading database ${NAME} into vm..  (Please wait, this will take a few minutes)"
-		mysql -u${DBUSER} -e "CREATE DATABASE ${NAME}" # May not be in the start of the sql file..
-		mysql -u${DBUSER} $NAME < $database;
-		duration=SECONDS
-		echo -e "--- Database ${NAME} has been loaded: Took $(($duration / 60)) minutes and $(($duration % 60)) seconds.\n"
-        done
-	echo -e "\n--- Setting up our MySQL user with every privilege \n"
-        mysql -u${DBUSER} -e "grant all privileges on *.* to '$DBUSER'@'localhost' identified by '$DBPASSWD'" >> $LOG
-        mysql -u${DBUSER} -e "FLUSH PRIVILEGES;" >>  $LOG
+    cd $DOCROOT
+    for sql_file in `ls *.sql | sort`
+    do
+        db_file_base=$(basename "${sql_file}")
+        # Get the database name from before the .sql part of the filename:
+        db_name="${db_file_base%.*}"
+        SECONDS=0
+        echo -e "\n--- Loading database ${db_name} into vm..  (Please wait, this will take a few minutes)"
+        mysql -u${DBUSER} -e "CREATE DATABASE ${db_name}" # May not be in the start of the sql file..
+        mysql -u${DBUSER} $db_name < $sql_file;
+        duration=SECONDS
+        echo -e "--- Database ${db_name} has been loaded: Took $(($duration / 60)) minutes and $(($duration % 60)) seconds.\n"
+    done
+    echo -e "\n--- Setting up our MySQL user with every privilege \n"
+    mysql -u${DBUSER} -e "grant all privileges on *.* to '$DBUSER'@'localhost' identified by '$DBPASSWD'" >> $LOG
+    mysql -u${DBUSER} -e "FLUSH PRIVILEGES;" >>  $LOG
         
-	# Restart mysql to apply change to remote access settings.
-	service mysql restart
+    #Restart mysql to apply change to remote access settings.
+    service mysql restart
 fi
 
 echo -e "Purging unnecessary packages \n"
 $APT autoremove -y >> $LOG
 
 echo -e "Configuring webserver write access to ost-config.php for install\n"
-if ! [[ -f "${DOCROOT}/include/ost-config.php" ]]
-then
     OSTC="${DOCROOT}/include/ost-config.php"
+if ! [[ -f "${OSTC}" ]]
+then
     cp $DOCROOT/include/ost-sampleconfig.php $OSTC
     chmod 0666 $OSTC
     echo -e "Configuring osticket settings based on provision script settings\n"
