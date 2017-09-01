@@ -46,10 +46,10 @@ APT="apt-get -yq --no-install-suggests --no-install-recommends "
 
 # Start by creating/clearing the logfile
 if ! [ -f "$LOG" ];	then touch $LOG; else >$LOG; fi
-if ! [ -d "$DOCROOT" ];then	mkdir -p $DOCROOT;fi
 date >> $LOG
 
 # Ignore things that aren't critical:
+ex +"%s@DPkg@//DPkg" -cwq /etc/apt/apt.conf.d/70debconf
 dpkg-reconfigure debconf -f noninteractive -p critical
 
 echo -e "Beginning provision run on $(hostname) running $(cat /etc/issue.net)." >> $LOG
@@ -66,7 +66,38 @@ apt-get -yq update >> $LOG
 # build-essential, for building code
 # python-software-properties.. lets us change things with bash, without complex regex
 echo -e "\n--- Installing base software packages, apache2,python,curl etc \n"
-$APT install apache2 vim curl build-essential python-software-properties >> $LOG
+$APT install apache2 vim curl build-essential python-software-properties unzip >> $LOG
+
+echo -e "Adding osTicket from GitHub if it's not already installed.\n"
+if ! [[ -d "$DOCROOT" ]]
+then
+# Shamelessly pinched from https://github.com/davijournal/docker-osticket/blob/master/Dockerfile :-) Cheers man! 
+# Download & install OSTicket
+    wget -nv -O osTicket.zip https://github.com/osTicket/osTicket/archive/develop.zip && echo "."
+    unzip osTicket.zip && echo "."
+    rm osTicket.zip && echo "."
+    mv osTicket-develop $DOCROOT && echo "."
+    chown -R www-data:www-data $DOCROOT && echo "."
+
+# Download languages packs
+    wget -nv -O $DOCROOT/include/i18n/fr.phar http://osticket.com/sites/default/files/download/lang/fr.phar && echo "."
+    wget -nv -O $DOCROOT/include/i18n/ar.phar http://osticket.com/sites/default/files/download/lang/ar.phar && echo "."
+    wget -nv -O $DOCROOT/include/i18n/pt_BR.phar http://osticket.com/sites/default/files/download/lang/pt_BR.phar && echo "."
+    wget -nv -O $DOCROOT/include/i18n/it.phar http://osticket.com/sites/default/files/download/lang/it.phar && echo "."
+    wget -nv -O $DOCROOT/include/i18n/es_ES.phar http://osticket.com/sites/default/files/download/lang/es_ES.phar && echo "."
+    wget -nv -O $DOCROOT/include/i18n/de.phar http://osticket.com/sites/default/files/download/lang/de.phar&& echo "."
+
+# Download Standard plugins
+    wget -nv -O $DOCROOT/include/plugins/auth-ldap.phar http://osticket.com/sites/default/files/download/plugin/auth-ldap.phar && echo "."
+    wget -nv -O $DOCROOT/include/plugins/storage-fs.phar http://osticket.com/sites/default/files/download/plugin/storage-fs.phar && echo "."
+    wget -nv -O $DOCROOT/include/plugins/storage-s3.phar http://osticket.com/sites/default/files/download/plugin/storage-s3.phar && echo "."
+    
+# Download clonemeagain plugins! :-)
+    #wget -nv -O /tmp/attachment_preview.zip https://github.com/clonemeagain/attachment_preview/archive/master.zip
+    #unzip -d $DOCROOT/include/attachment_preview /tmp/attachment_preview.zip
+fi
+
+
 
 echo -e "\n--- Enabling Required Apache Modules \n"
 a2enmod alias auth_basic authn_file dir env expires headers mime negotiation reqtimeout rewrite setenvif ssl unique_id >> $LOG
@@ -176,7 +207,7 @@ password=${DBPASSWD}
     echo -e "\n--- Allowing remote MySQL access (Remove this in Prod!)\n";
     sed -i -e 's/127.0.0.1/0.0.0.0/' /etc/mysql/my.cnf
 
-    cd $DOCROOT
+    cd $SYNCDIR
     for sql_file in `ls *.sql | sort`
     do
         db_file_base=$(basename "${sql_file}")
@@ -199,6 +230,17 @@ fi
 
 echo -e "Purging unnecessary packages \n"
 $APT autoremove -y >> $LOG
+
+echo -e "Adding a cronjob for Tickets\n"
+if ! [[ -f "/etc/cron.d/tickets" ]]
+then
+    echo "*/5 * * * * www-data /usr/bin/php $DOCROOT/api/cron.php\n" > /etc/cron.d/tickets
+fi
+
+echo -e "Making a fake email MTA to save all email to /logs/email.log\n"
+echo "#!/usr/bin/env sh
+cat >> $LOGS/email.log" > /usr/bin/sendmail
+chmod +x /usr/bin/sendmail
 
 echo -e "Configuring webserver write access to ost-config.php for install\n"
     OSTC="${DOCROOT}/include/ost-config.php"
