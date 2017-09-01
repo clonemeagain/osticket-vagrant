@@ -1,4 +1,4 @@
-# osTicket vagrant server environment
+# [osTicket](https://github.com/osTicket/osTicket) vagrant server environment
 
 This is what I use to write plugins, test things, write patches etc.
 
@@ -16,10 +16,6 @@ Based on `ubuntu/xenial64` with Apache2, PHP 7.0 (libapache) and MySQL Server (5
 * Go make a coffee while it downloads Ubuntu, installs software & configures everything.
 
 When it's done, and you see the message: `Ready to Rock!`, it should have a link, like http://localhost:8080 click that to start the install process.
-
-For testing mail, simply visit http://localhost:8080/mailcatcher 
-For SMTP manual config, use SMTP Server: smtp://127.0.0.1:1025
-Otherwise, default mail should route to it.
 
 If you've installed it, and configured it, and made a bunch of test tickets etc, simply export your database into the project root folder as `dbname.sql` where dbname is the name of your database. The provision script will detect it and install the database. If you also have an ost-config.php file inside /include/ then it will skip copying it. 
 
