@@ -82,11 +82,6 @@ VHOST=$(cat <<EOF
     </Directory>
     CustomLog ${LOGS}/access.log combined
     ErrorLog ${LOGS}/error.log
-    
-    ProxyRequests Off
-	ProxyPass /mailcatcher http://localhost:1080
-	ProxyPass /assets http://localhost:1080/assets
-	ProxyPass /messages ws://localhost:1080/messages
 </VirtualHost>
 EOF
 )
