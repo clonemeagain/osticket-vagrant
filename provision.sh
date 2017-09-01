@@ -3,7 +3,7 @@
 # vi: set ft=bash :
 
 # Provision script to setup a new osTicket Vagrant boxes
-# Last updated August 2017
+# Last updated September 2017
 # Author: Aaron clonemeagain@gmail.com
 # Repo: https://github.com/clonemeagain/osticket-vagrant
 
@@ -148,23 +148,6 @@ then
     touch $LOGS/xdebug.log
 fi
 chmod 666 $LOGS/xdebug.log
-
-echo -e "\n--- Installing mailcatcher from http://mailcatcher.me => http://localhost:8080/mailcatcher \n"
-# http://mailcatcher.me/
-$APT install -y ruby-dev libsqlite3-dev >> $LOG
-gem install mailcatcher >> $LOG
-# enable apache proxy modules to configure a reverse proxy to mailcatchers webfrontend
-a2enmod proxy proxy_http proxy_wstunnel >> $LOG
- 
-# replace sendmail path in php.ini with catchmail path
-CATCHMAIL="$(which catchmail)"
-sed -i "s|;sendmail_path\s=.*|sendmail_path = ${CATCHMAIL} -f www-data@localhost|" $PHP_DIR/php.ini
-
-# Make it start on boot (without having to reprovision)
-echo "@reboot root ${CATCHMAIL} --ip=0.0.0.0" >> /etc/crontab
-update-rc.d cron defaults
-# Start
-$CATCHMAIL --ip=0.0.0.0
 
 echo -e "\n--- Restarting Apache to activate PHP configuration. \n"
 service apache2 restart >> $LOG
