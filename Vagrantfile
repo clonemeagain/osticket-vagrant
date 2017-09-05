@@ -5,7 +5,10 @@
 # Vagrant plugins I use: proxyconf, share, vbguest
 # Configure these to your timezone and proxy server:
 timezone = 'Australia/Melbourne'
-proxy = '10.43.1.14:3128'
+proxy = ''
+
+raise 'For faster rebuilds, install the vbguest plugin. See the README for details' unless Vagrant.has_plugin?("vagrant-vbguest")
+raise 'For faster rebuilds, install the proxyconf vagrant plugin. See the README for details' unless Vagrant.has_plugin?("vagrant-proxyconf")
 
 Vagrant.configure("2") do |config|
     # Every Vagrant development environment requires a box. You can search for

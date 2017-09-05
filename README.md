@@ -20,10 +20,9 @@ When it's done, and you see the message: `Ready to Rock!`, it should have a link
 If you've installed it, and configured it, and made a bunch of test tickets etc, simply export your database into the project root folder as `dbname.sql` where dbname is the name of your database. The provision script will detect it and install the database. If you also have an ost-config.php file inside /include/ then it will skip copying it. 
 
 ## Recommended Vagrant Plugins:
-`vagrant plugin install ${each}`
+* `vagrant plugin install vagrant-proxyconf` - Lets you use a local proxy server to cache install packages etc. Autoconfigures apt. [link to repo](https://github.com/tmatilai/vagrant-proxyconf)
+* `vagrant plugin install vagrant-vbguest` - Ensures the vm has the Virtualbox Guest Additions installed, and keeps them up to date. [link to repo](https://github.com/dotless-de/vagrant-vbguest)
 
-* vagrant-proxyconf - Lets you use a local proxy server to cache install packages etc. 
-* vagrant-vbguest   - Ensures the vm has the Virtualbox Guest Additions installed, and keeps them up to date.
 
 ## Debugging:
 Xdebug is enabled and installed by default (so, don't use this in production)
