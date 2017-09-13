@@ -7,8 +7,6 @@
 timezone = 'Australia/Melbourne'
 proxy = ''
 
-raise 'For faster rebuilds, install the vbguest plugin. See the README for details' unless Vagrant.has_plugin?("vagrant-vbguest")
-raise 'For faster rebuilds, install the proxyconf vagrant plugin. See the README for details' unless Vagrant.has_plugin?("vagrant-proxyconf")
 
 Vagrant.configure("2") do |config|
     # Every Vagrant development environment requires a box. You can search for
@@ -31,7 +29,7 @@ Vagrant.configure("2") do |config|
     end
     
     # Specify the sync directory
-    config.vm.synced_folder ".","/var/www/html", create: true, type: "virtualbox"
+    config.vm.synced_folder ".","/var/www/html", create: true, type: "rsync"
 
     # Create a forwarded port mapping which allows access to a specific port
     # within the machine from a port on the host machine. In the example below,
@@ -47,7 +45,7 @@ Vagrant.configure("2") do |config|
     end
   
     # Set the timezone
-    config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/#{timezone} /etc/localtime", run: "always"
+    config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/#{timezone} /etc/localtime && sudo service apache2 start", run: "always"
 
     #Ensure the correct shell is loaded for our provisioning script.
     config.ssh.shell = "bash -c 'BASH_ENV=/etc/profile exec bash'"
