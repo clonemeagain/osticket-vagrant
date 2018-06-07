@@ -45,7 +45,7 @@ Vagrant.configure("2") do |config|
     end
   
     # Set the timezone
-    config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/#{timezone} /etc/localtime && sudo service apache2 start", run: "always"
+    config.vm.provision :shell, :inline => "sudo rm /etc/localtime && sudo ln -s /usr/share/zoneinfo/#{timezone} /etc/localtime && apache2 --version 2&>1 >/dev/null && sudo service apache2 start", run: "always"
 
     #Ensure the correct shell is loaded for our provisioning script.
     config.ssh.shell = "bash -c 'BASH_ENV=/etc/profile exec bash'"
