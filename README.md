@@ -7,8 +7,8 @@ Built to assist with development, assumes you have or can clone osticket source 
 Based on `ubuntu/xenial64` with Apache2, PHP 7.0 (libapache) and MySQL Server (5.7)
 
 ## How to use
-* Install [Vagrant](https://www.vagrantup.com/docs/installation/)
-* Download this repo (git clone https://github.com/clonemeagain/vagrant-osticket)
+* Install [Vagrant](https://www.vagrantup.com/docs/installation/) (With Virtualbox or Hyperv etc)
+* Download this repo (git clone https://github.com/clonemeagain/osticket-vagrant)
 * Then, download/clone osTicket into a folder called `osticket` Either from source: `git clone https://github.com/osTicket/osTicket osticket`, or Release: http://osticket.com/download
 * Configure the variables in Vagrantfile with your environment details, Timezone/proxy server etc.
 * Configure the variables in provision.sh script. 
